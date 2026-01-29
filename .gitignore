@@ -1,0 +1,17 @@
+# Sanal Ortamları Yoksay
+.venv/
+venv/
+env/
+
+# Derlenmiş Python Dosyalarını Yoksay
+__pycache__/
+*.pyc
+
+# Yerel Veritabanı Dosyalarını Yoksay (GitHub'a veri atılmaz)
+qdrant_db/
+
+# Sistem Dosyaları
+.DS_Store
+
+# VS Code Ayarları (Opsiyonel)
+.vscode/
