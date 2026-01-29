@@ -3,7 +3,7 @@ import requests
 import time
 
 # --- AYARLAR ---
-API_URL = "http://127.0.0.1:8000/ask"
+API_URL = "http://localhost:9090/api/v1/chat"
 st.set_page_config(page_title="NexusAI Asistan", page_icon="🤖", layout="centered")
 
 # --- BAŞLIK VE TASARIM ---
