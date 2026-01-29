@@ -1,0 +1,18 @@
+# Sanal Ortam (En büyük düşmanımız bu)
+.venv
+venv/
+
+# Git Geçmişi
+.git
+.gitignore
+
+# Yerel Veritabanı (Docker içinde sıfırdan oluşmalı)
+qdrant_db/
+
+# Python Ön Bellekleri
+__pycache__
+*.pyc
+
+# VS Code Ayarları
+.vscode
+

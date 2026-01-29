@@ -26,7 +26,17 @@ vector_store = QdrantVectorStore(
 )
 retriever = vector_store.as_retriever(search_kwargs={"k": 3})
 
-llm = ChatOllama(model="llama3.2", temperature=0.3)
+import os
+
+# YENİ HALİ:
+# Eğer 'OLLAMA_HOST' diye bir çevre değişkeni varsa onu kullan, yoksa varsayılanı kullan.
+ollama_host = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+
+llm = ChatOllama(
+    model="llama3.2", 
+    temperature=0.3,
+    base_url=ollama_host
+)
 
 # 2. Zinciri (Chain) Hazırla
 prompt = ChatPromptTemplate.from_template("""
