@@ -25,7 +25,7 @@ public class ChatController {
         System.out.println("📢 [JAVA LOG] İstek yakalandı! Gelen Soru: " + request.getQuestion());
 
         try {
-            // ❌ ESKİ YÖNTEM (SİLİNDİ):
+
             // String jsonBody = objectMapper.writeValueAsString(request);
 
             // ✅ YENİ YÖNTEM:

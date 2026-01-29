@@ -1,23 +1,22 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 import time
-import os
 
-# Gerekli Kütüphaneler
+# RAG Kütüphaneleri
 from langchain_qdrant import QdrantVectorStore
 from qdrant_client import QdrantClient
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_ollama import ChatOllama
-from langchain_community.tools import DuckDuckGoSearchRun
-from langchain_classic.tools.retriever import create_retriever_tool
-from langchain.agents import create_react_agent, AgentExecutor # <-- DÜZELTME BURADA
-from langchain_core.prompts import PromptTemplate # <-- Prompt'u kendimiz tanımlayacağız
+from langchain_classic.chains import create_retrieval_chain
+from langchain_classic.chains.combine_documents import create_stuff_documents_chain
+from langchain_core.prompts import ChatPromptTemplate
 
-print("🚀 NexusAI Agent Başlatılıyor (Web Search Aktif)...")
+# --- BAŞLANGIÇ AYARLARI (Sadece 1 kere çalışır) ---
+print("🚀 NexusAI API Başlatılıyor...")
 
-app = FastAPI(title="NexusAI Agent", version="2.0")
+app = FastAPI(title="NexusAI Engine", version="1.0")
 
-# --- 1. AYARLAR ---
+# 1. Modelleri ve Veritabanını Hafızaya Yükle (Global Değişkenler)
 embedding_model = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
 client = QdrantClient(path="./qdrant_db")
 vector_store = QdrantVectorStore(
@@ -27,58 +26,43 @@ vector_store = QdrantVectorStore(
 )
 retriever = vector_store.as_retriever(search_kwargs={"k": 3})
 
-# --- 2. ARAÇLAR (TOOLS) ---
-retriever_tool = create_retriever_tool(
-    retriever,
-    "pdf_knowledge_base",
-    "Kullanıcının yüklediği özel belgelerde veya PDF notlarında arama yapar. Öncelikle bunu kullan."
-)
+import os
 
-search_tool = DuckDuckGoSearchRun() 
-
-tools = [retriever_tool, search_tool]
-
-# --- 3. BEYİN (LLM) ---
+# YENİ HALİ:
+# Eğer 'OLLAMA_HOST' diye bir çevre değişkeni varsa onu kullan, yoksa varsayılanı kullan.
 ollama_host = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
 
 llm = ChatOllama(
-    model="llama3.2",
-    temperature=0,
+    model="llama3.2", 
+    temperature=0.3,
     base_url=ollama_host,
-    repeat_penalty=1.1,
+    repeat_penalty=1.2,  # <-- SİHİRLİ DOKUNUŞ: Tekrarı cezalandırır
+    top_k=50,            # <-- Kelime havuzunu sınırlar (daha mantıklı cümleler)
+    top_p=0.9            # <-- Olasılık filtresi
 )
 
-# --- 4. AJAN PROMPT (Talimatlar) ---
-# Ajanın nasıl düşüneceğini belirten şablon
-template = '''Sen Türkçe konuşan zeki bir asistansın. Sorulan soruya cevap vermek için elindeki araçları (Tools) kullanmalısın.
+# 2. Zinciri (Chain) Hazırla
+prompt = ChatPromptTemplate.from_template("""
+Sen Türkçe konuşan profesyonel bir yapay zeka asistanısın.
+Kurallar:
+1. Cevabı MUTLAKA Türkçe ver.
+2. Bağlam dışına çıkma.
 
-Elinin altındaki araçlar:
-{tools}
-
-Soru: {input}
-
-Düşünce Süreci (Thought): Ne yapmam gerekiyor? (Sırasıyla düşün)
-Adım (Action): Hangi aracı kullanmalıyım? [{tool_names}]
-Adım Girdisi (Action Input): Araç için arama kelimesi nedir?
-Gözlem (Observation): Aracın cevabı nedir?
-... (Bu adımlar tekrarlanabilir)
-Düşünce (Thought): Artık cevabı biliyorum.
-Final Cevap (Final Answer): Sorunun Türkçe cevabı.
-
-Haydi Başla!
+<Bağlam>
+{context}
+</Bağlam>
 
 Soru: {input}
-Düşünce Süreci: {agent_scratchpad}'''
+""")
 
-prompt = PromptTemplate.from_template(template)
+question_answer_chain = create_stuff_documents_chain(llm, prompt)
+rag_chain = create_retrieval_chain(retriever, question_answer_chain)
 
-# --- 5. AJANI OLUŞTUR (Standart AgentExecutor) ---
-agent = create_react_agent(llm, tools, prompt)
-agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True, handle_parsing_errors=True)
+print("✅ Sistem Hazır! İstek bekleniyor...")
 
-print("✅ Ajan Hazır! Hem PDF'e hem İnternete bakabilir.")
+# --- API ENDPOINTLERİ ---
 
-# --- API ---
+# İstek Modeli (Gelen verinin formatı)
 class QueryRequest(BaseModel):
     question: str
 
@@ -87,17 +71,25 @@ def ask_question(request: QueryRequest):
     try:
         start_time = time.time()
         
-        # Ajanı çalıştır
-        response = agent_executor.invoke({"input": request.question})
+        # Zinciri çalıştır
+        response = rag_chain.invoke({"input": request.question})
         
         duration = time.time() - start_time
         
+        # Kaynakları temizle
+        sources = []
+        for doc in response["context"]:
+            sources.append(doc.page_content[:100].replace("\n", " ") + "...")
+
         return {
-            "answer": response["output"], # AgentExecutor 'output' döndürür
-            "sources": ["Agent Decision (Web or DB)"],
+            "answer": response["answer"],
+            "sources": sources,
             "processing_time": f"{duration:.2f} sn"
         }
         
     except Exception as e:
-        print(f"HATA: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/")
+def read_root():
+    return {"status": "NexusAI Engine is Running 🚀"}
