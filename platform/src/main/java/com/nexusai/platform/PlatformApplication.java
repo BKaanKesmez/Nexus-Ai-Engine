@@ -3,11 +3,13 @@ package com.nexusai.platform;
 import com.fasterxml.jackson.databind.ObjectMapper; // 👈 BU EKLENECEK
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.persistence.autoconfigure.EntityScan;
 import org.springframework.cloud.openfeign.EnableFeignClients;
 import org.springframework.context.annotation.Bean; // 👈 BU EKLENECEK
 
 @SpringBootApplication
 @EnableFeignClients
+@EntityScan("com.nexusai.platform.model")
 public class PlatformApplication {
 
 	public static void main(String[] args) {

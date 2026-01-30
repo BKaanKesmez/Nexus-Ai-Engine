@@ -1,0 +1,50 @@
+version: '3.8'
+
+services:
+  # 1. Veritabanı (Hafıza)
+  nexus-db:
+    image: postgres:15-alpine
+    container_name: nexus-db
+    environment:
+      POSTGRES_USER: nexus
+      POSTGRES_PASSWORD: Bk20032511
+      POSTGRES_DB: nexusdb
+    ports:
+      - "5435:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - nexus-network
+
+  # 2. Yapay Zeka Motoru (Beyin)
+  ai-engine:
+    build: .              # Python dosyaları mevcut dizinde
+    container_name: nexus-ai-engine
+    ports:
+      - "8000:8000"
+    networks:
+      - nexus-network
+
+  # 3. Java Backend (Orkestra Şefi)
+  backend:
+    build: ./platform       # Java dosyaları 'platform' klasöründe
+    container_name: nexus-backend
+    ports:
+      - "9090:9090"
+    depends_on:
+      - nexus-db
+      - ai-engine
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://nexus-db:5432/nexusdb
+      SPRING_DATASOURCE_USERNAME: nexus
+      SPRING_DATASOURCE_PASSWORD: Bk20032511
+      PYTHON_SERVICE_URL: http://ai-engine:8000/ask
+    networks:
+      - nexus-network
+
+volumes:
+  postgres_data:
+
+networks:
+  nexus-network:
+    driver: bridge

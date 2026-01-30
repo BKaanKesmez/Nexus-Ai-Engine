@@ -2,6 +2,7 @@ package com.nexusai.platform.model;
 
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 
 @Entity
 @Table(name = "chat_messages")
@@ -21,6 +22,7 @@ public class ChatMessage {
     // Hangi sohbete ait olduğunu bilmeli (Many-To-One)
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "session_id")
+    @JsonIgnore
     private ChatSession session;
 
     // --- Constructor ---
