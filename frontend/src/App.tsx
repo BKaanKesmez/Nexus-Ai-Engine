@@ -16,21 +16,46 @@ function App() {
   const sendMessage = async () => {
     if (!input.trim()) return;
 
-    // 1. Kullanıcı mesajını ekle
+    // 1. Kullanıcı mesajını ekrana bas
     const userMessage: Message = { role: 'user', content: input };
     setMessages((prev) => [...prev, userMessage]);
-    setInput('');
-    setIsLoading(true);
+    setInput(''); // Input'u temizle
+    setIsLoading(true); // Yükleniyor animasyonunu aç
 
-    // --- BURAYA JAVA BAĞLANTISI GELECEK (Şimdilik taklit yapalım) ---
-    setTimeout(() => {
+    try {
+      // 2. Java Backend'e (9090 Portuna) İstek At
+      const response = await fetch('http://localhost:9090/api/v1/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ question: input }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Sunucu hatası!');
+      }
+
+      const data = await response.json();
+
+      // 3. Gelen cevabı ekrana bas
+      const botMessage: Message = { 
+        role: 'assistant', 
+        content: data.answer // Java'dan gelen 'answer' alanı
+      };
+      
+      setMessages((prev) => [...prev, botMessage]);
+
+    } catch (error) {
+      console.error("Hata:", error);
+      // Hata durumunda kullanıcıya bilgi ver
       setMessages((prev) => [
         ...prev, 
-        { role: 'assistant', content: 'Şu an Java Backend ile bağlantım yok ama arayüz harika görünüyor! 😎' }
+        { role: 'assistant', content: '⚠️ Üzgünüm, sunucuya bağlanamadım. Backend (9090) çalışıyor mu?' }
       ]);
-      setIsLoading(false);
-    }, 1000);
-    // -------------------------------------------------------------
+    } finally {
+      setIsLoading(false); // Yükleniyor animasyonunu kapat
+    }
   };
 
   return (
