@@ -1,44 +1,42 @@
 package com.nexusai.platform.controller;
 
-import com.nexusai.platform.client.AiEngineClient;
 import com.nexusai.platform.dto.AiResponse;
 import com.nexusai.platform.dto.QuestionRequest;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.nexusai.platform.model.ChatMessage;
+import com.nexusai.platform.model.ChatSession;
+import com.nexusai.platform.service.ChatService;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/chat")
-@CrossOrigin
+@CrossOrigin(origins = "http://localhost:5173") // React'e izin ver
 public class ChatController {
 
-    private final AiEngineClient aiEngineClient;
-    private final ObjectMapper objectMapper;
+    private final ChatService chatService;
 
-    // Kurucumuz aynı kalıyor
-    public ChatController(AiEngineClient aiEngineClient, ObjectMapper objectMapper) {
-        this.aiEngineClient = aiEngineClient;
-        this.objectMapper = objectMapper;
+    public ChatController(ChatService chatService) {
+        this.chatService = chatService;
     }
 
+    // 1. Mesaj Gönder (Hem yeni sohbet, hem devam eden sohbet)
+    // Örnek: POST /api/v1/chat?sessionId=5
     @PostMapping
-    public AiResponse chat(@RequestBody QuestionRequest request) {
-        System.out.println("📢 [JAVA LOG] İstek yakalandı! Gelen Soru: " + request.getQuestion());
+    public AiResponse chat(@RequestBody QuestionRequest request,
+                           @RequestParam(required = false) Long sessionId) {
+        return chatService.sendMessage(sessionId, request.getQuestion());
+    }
 
-        try {
+    // 2. Tüm Sohbet Başlıklarını Getir (Sidebar için)
+    @GetMapping("/sessions")
+    public List<ChatSession> getAllSessions() {
+        return chatService.getAllSessions();
+    }
 
-            // String jsonBody = objectMapper.writeValueAsString(request);
-
-            // ✅ YENİ YÖNTEM:
-            // Nesneyi direkt gönderiyoruz. Feign arka planda hallediyor.
-            // Python'dan gelen cevabı String olarak alıyoruz (rawResponse).
-            String rawResponse = aiEngineClient.askQuestion(request);
-
-            // Gelen cevabı Java nesnesine çeviriyoruz
-            return objectMapper.readValue(rawResponse, AiResponse.class);
-
-        } catch (Exception e) {
-            // Hata mesajını daha net görebilmek için e.toString() ekledim
-            throw new RuntimeException("AI Servisi Hatası: " + e.toString());
-        }
+    // 3. Bir Sohbetin Mesajlarını Getir (Tıklayınca yüklenmesi için)
+    @GetMapping("/sessions/{sessionId}/messages")
+    public List<ChatMessage> getSessionMessages(@PathVariable Long sessionId) {
+        return chatService.getSessionMessages(sessionId);
     }
 }
