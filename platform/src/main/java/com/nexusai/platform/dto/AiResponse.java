@@ -11,6 +11,11 @@ public class AiResponse {
     public AiResponse() {
     }
 
+    // 2. Dolu Constructor (İşte eksik olan parça bu! 👇)
+    public AiResponse(String answer) {
+        this.answer = answer;
+    }
+
     // Getter ve Setter'lar
     public String getAnswer() {
         return answer;

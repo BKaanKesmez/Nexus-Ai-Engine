@@ -1,15 +1,25 @@
 package com.nexusai.platform.client;
 
-import com.nexusai.platform.dto.QuestionRequest; // Bunu import etmeyi unutma
-import org.springframework.cloud.openfeign.FeignClient;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
+import com.nexusai.platform.dto.QuestionRequest; // <-- SENİN SINIFIN
+import com.nexusai.platform.dto.AiResponse;      // <-- SENİN SINIFIN
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
+import org.springframework.web.client.RestTemplate;
 
-@FeignClient(name = "ai-engine", url = "${ai.service.url}")
-public interface AiEngineClient {
+@Component
+public class AiEngineClient {
 
-    // DİKKAT: Parametre tipini String'den QuestionRequest'e çevirdik.
-    // Feign bunu otomatik olarak JSON'a çevirecek.
-    @PostMapping(value = "/ask", consumes = "application/json")
-    String askQuestion(@RequestBody QuestionRequest request);
+    private final RestTemplate restTemplate;
+
+    @Value("${python.service.url}")
+    private String pythonServiceUrl;
+
+    public AiEngineClient(RestTemplate restTemplate) {
+        this.restTemplate = restTemplate;
+    }
+
+    public AiResponse askPython(QuestionRequest request) {
+        // Python'a senin DTO'larınla istek atıyoruz
+        return restTemplate.postForObject(pythonServiceUrl, request, AiResponse.class);
+    }
 }
