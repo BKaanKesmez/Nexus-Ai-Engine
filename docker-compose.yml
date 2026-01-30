@@ -20,6 +20,8 @@ services:
   ai-engine:
     build: .              # Python dosyaları mevcut dizinde
     container_name: nexus-ai-engine
+    environment:
+      TAVILY_API_KEY: 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
     ports:
       - "8000:8000"
     networks:

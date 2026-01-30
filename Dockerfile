@@ -1,20 +1,35 @@
-# 1. Hafif bir Python sürümü kullan (Linux tabanlı)
+# Hafif Python imajı
 FROM python:3.11-slim
 
-# 2. Çalışma klasörünü ayarla
+# Çalışma dizini
 WORKDIR /app
 
-# 3. Gereksinim dosyasını kopyala ve kütüphaneleri kur
-COPY requirements.txt .
-# --no-cache-dir: Docker imajını şişirmemek için önbelleği temizle
-RUN pip install --no-cache-dir -r requirements.txt
+# Sistem gereksinimleri (temizliğiyle birlikte)
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
 
-# 4. Kod dosyalarını kopyala
+# Pip ayarları (Hız için önbellek kapalı)
+ENV PIP_DEFAULT_TIMEOUT=100 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PIP_NO_CACHE_DIR=1
+
+# --- HIZLANDIRMA BÖLÜMÜ ---
+# 1. Önce PyTorch'un CPU sürümünü (Hafif Sürüm) yükle.
+# Bu satır 2GB yerine sadece ~150MB indirmesini sağlar.
+RUN pip install torch --index-url https://download.pytorch.org/whl/cpu
+
+# 2. Şimdi requirements.txt dosyasını kopyala
+COPY requirements.txt .
+
+# 3. Diğer paketleri yükle
+# (Torch zaten yüklü olduğu için onu tekrar indirmeyecek, zaman kazanacaksın)
+RUN pip install -r requirements.txt
+
+# 4. Kaynak kodları kopyala
 COPY . .
 
-# 5. API Portunu dışarı aç (FastAPI varsayılan portu 8000)
+# Başlat
 EXPOSE 8000
-
-# 6. Uygulamayı başlat
-# host 0.0.0.0: Dış dünyadan gelen isteklere açık ol demek
 CMD ["uvicorn", "api:app", "--host", "0.0.0.0", "--port", "8000"]
