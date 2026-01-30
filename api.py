@@ -3,79 +3,99 @@ from pydantic import BaseModel
 import time
 import os
 
-# RAG Kütüphaneleri
+# Tavily ve RAG
+from langchain_community.tools.tavily_search import TavilySearchResults
 from langchain_qdrant import QdrantVectorStore
-from qdrant_client import QdrantClient, models  # <--- DÜZELTME BURADA: 'models' EKLENDİ
+from qdrant_client import QdrantClient, models
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_ollama import ChatOllama
-from langchain_classic.chains import create_retrieval_chain
-from langchain_classic.chains.combine_documents import create_stuff_documents_chain
 from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.output_parsers import StrOutputParser
 
 # --- BAŞLANGIÇ AYARLARI ---
-print("🚀 NexusAI API Başlatılıyor...")
+print("🚀 NexusAI Hızlı Mod (Pipeline) Başlatılıyor...")
 
-app = FastAPI(title="NexusAI Engine", version="1.0")
+app = FastAPI(title="NexusAI Fast Engine", version="3.0")
 
-# 1. Modelleri ve Veritabanını Hafızaya Yükle
+# 1. Veritabanı Ayarları
 embedding_model = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
-
-# Qdrant istemcisini başlat
 client = QdrantClient(path="qdrant_db")
 collection_name = "my_documents"
 
-# --- KOLEKSİYON KONTROLÜ ---
-# Eğer koleksiyon yoksa, boş bir tane oluştur (Hata vermemesi için)
 if not client.collection_exists(collection_name):
-    print(f"⚠️ Uyarı: '{collection_name}' bulunamadı. Boş olarak oluşturuluyor...")
     client.create_collection(
         collection_name=collection_name,
-        vectors_config=models.VectorParams(
-            size=384, # all-MiniLM-L6-v2 modeli için boyut 384'tür.
-            distance=models.Distance.COSINE
-        )
+        vectors_config=models.VectorParams(size=384, distance=models.Distance.COSINE)
     )
 
-# Vector Store Bağlantısı
 vector_store = QdrantVectorStore(
     client=client,
     collection_name=collection_name,
     embedding=embedding_model,
 )
-retriever = vector_store.as_retriever(search_kwargs={"k": 3})
 
-# LLM Ayarları
-ollama_host = os.getenv("OLLAMA_BASE_URL", "http://host.docker.internal:11434") 
-# Not: Docker içinden localhost'a erişmek için 'host.docker.internal' kullanmak daha güvenlidir.
+# 2. Araçlar (Doğrudan Çağıracağız)
+tavily_tool = TavilySearchResults(max_results=3) # En iyi 3 sonucu getir
 
+# 3. LLM (Beyin)
+ollama_host = os.getenv("OLLAMA_BASE_URL", "http://host.docker.internal:11434")
 llm = ChatOllama(
-    model="llama3.2", 
-    temperature=0.3,
+    model="llama3.2",
+    temperature=0.3, # Daha tutarlı olması için düşük
     base_url=ollama_host,
-    repeat_penalty=1.2,
-    top_k=50,
-    top_p=0.9
 )
 
-# 2. Zinciri (Chain) Hazırla
-prompt = ChatPromptTemplate.from_template("""
-Sen Türkçe konuşan profesyonel bir yapay zeka asistanısın.
-Kurallar:
-1. Cevabı MUTLAKA Türkçe ver.
-2. Bağlam dışına çıkma.
-3. Eğer bağlamda bilgi yoksa "Bu konuda bilgim yok" de.
+# 4. Prompt Şablonu (Düşünme adımları yok, direkt cevap var)
+template = """
+Sen yardımsever bir asistansın. Aşağıdaki bağlamı kullanarak kullanıcının sorusunu cevapla.
 
-<Bağlam>
+<Bulunan Bilgiler>
 {context}
-</Bağlam>
+</Bulunan Bilgiler>
 
-Soru: {input}
-""")
+Kurallar:
+1. Sadece verilen bilgileri kullan.
+2. Cevabı MUTLAKA Türkçe ver.
+3. Kısa ve net ol.
 
-question_answer_chain = create_stuff_documents_chain(llm, prompt)
-rag_chain = create_retrieval_chain(retriever, question_answer_chain)
+Soru: {question}
+"""
+prompt = ChatPromptTemplate.from_template(template)
+chain = prompt | llm | StrOutputParser()
 
-print("✅ Sistem Hazır! İstek bekleniyor...")
+# --- YARDIMCI FONKSİYONLAR ---
+
+def get_combined_context(query: str):
+    """
+    Hem hafızayı hem interneti aynı anda tarar ve birleştirir.
+    Bu kısım 'Ajan'ın yaptığı işi manuel ve hızlı yapar.
+    """
+    context_parts = []
+    
+    # A) Hafıza Araması (RAG)
+    try:
+        docs = vector_store.similarity_search(query, k=2)
+        if docs:
+            memory_text = "\n".join([f"- [Hafıza]: {d.page_content}" for d in docs])
+            context_parts.append(memory_text)
+    except Exception as e:
+        print(f"RAG Hatası: {e}")
+
+    # B) İnternet Araması (Tavily) - Her zaman ara (veya RAG boşsa ara)
+    # Hız için: Her sorguda internete de bakıyoruz ki güncel olsun.
+    try:
+        web_results = tavily_tool.invoke(query)
+        # Tavily bazen liste bazen string döner, kontrol edelim
+        if isinstance(web_results, list):
+            web_text = "\n".join([f"- [İnternet]: {res.get('content', '')}" for res in web_results])
+            context_parts.append(web_text)
+        else:
+             context_parts.append(f"- [İnternet]: {str(web_results)}")
+             
+    except Exception as e:
+        print(f"Tavily Hatası: {e}")
+
+    return "\n\n".join(context_parts)
 
 # --- API ENDPOINTLERİ ---
 
@@ -87,27 +107,27 @@ def ask_question(request: QueryRequest):
     try:
         start_time = time.time()
         
-        # Zinciri çalıştır
-        response = rag_chain.invoke({"input": request.question})
+        # 1. ADIM: Bilgi Topla (Düşünmek yok, direkt topla)
+        context_data = get_combined_context(request.question)
+        
+        if not context_data.strip():
+            context_data = "Herhangi bir bilgi bulunamadı."
+
+        # 2. ADIM: Cevabı Üret (Tek LLM çağrısı)
+        answer = chain.invoke({"context": context_data, "question": request.question})
         
         duration = time.time() - start_time
-        
-        # Kaynakları temizle
-        sources = []
-        if "context" in response:
-            for doc in response["context"]:
-                sources.append(doc.page_content[:100].replace("\n", " ") + "...")
 
         return {
-            "answer": response["answer"],
-            "sources": sources,
+            "answer": answer,
+            "sources": ["Hybrid Search (Memory + Web)"],
             "processing_time": f"{duration:.2f} sn"
         }
         
     except Exception as e:
-        print(f"HATA OLUŞTU: {str(e)}") # Konsola hatayı bas
+        print(f"HATA: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/")
 def read_root():
-    return {"status": "NexusAI Engine is Running 🚀"}
+    return {"status": "NexusAI Fast Mode is Active ⚡"}
