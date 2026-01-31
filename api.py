@@ -8,7 +8,12 @@ from langchain_community.tools.tavily_search import TavilySearchResults
 from langchain_qdrant import QdrantVectorStore
 from qdrant_client import QdrantClient, models
 from langchain_huggingface import HuggingFaceEmbeddings
-from langchain_ollama import ChatOllama
+from langchain_groq import ChatGroq
+import os
+from dotenv import load_dotenv
+
+load_dotenv() # .env dosyasını okumak için
+
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 
@@ -38,11 +43,15 @@ vector_store = QdrantVectorStore(
 tavily_tool = TavilySearchResults(max_results=3) # En iyi 3 sonucu getir
 
 # 3. LLM (Beyin)
-ollama_host = os.getenv("OLLAMA_BASE_URL", "http://host.docker.internal:11434")
-llm = ChatOllama(
-    model="llama3.2",
-    temperature=0.3, # Daha tutarlı olması için düşük
-    base_url=ollama_host,
+groq_api_key = os.getenv("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")
+
+if not groq_api_key:
+    raise ValueError("GROQ_API_KEY bulunamadı! Lütfen .env dosyasına veya Docker ortamına ekleyin.")
+
+llm = ChatGroq(
+    groq_api_key=groq_api_key,
+    model_name="llama-3.3-70b-versatile", # Veya "llama-3.1-8b-instant" (Daha hızlı)
+    temperature=0.3
 )
 
 # 4. Prompt Şablonu (Düşünme adımları yok, direkt cevap var)

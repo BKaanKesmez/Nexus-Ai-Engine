@@ -22,6 +22,7 @@ services:
     container_name: nexus-ai-engine
     environment:
       TAVILY_API_KEY: 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
+      GROQ_API_KEY: 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
     ports:
       - "8000:8000"
     networks:
