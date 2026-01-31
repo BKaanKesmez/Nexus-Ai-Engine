@@ -30,17 +30,23 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-                .csrf(csrf -> csrf.disable()) // API kullandığımız için CSRF kapalı
+                .csrf(csrf -> csrf.disable()) // API olduğu için CSRF kapalı
+                // 🔥 YENİ KISIM: CORS İZNİ (React'e Kapıyı Açıyoruz)
+                .cors(cors -> cors.configurationSource(request -> {
+                    var corsConfiguration = new org.springframework.web.cors.CorsConfiguration();
+                    corsConfiguration.setAllowedOrigins(java.util.List.of("http://localhost:5173")); // React Adresi
+                    corsConfiguration.setAllowedMethods(java.util.List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+                    corsConfiguration.setAllowedHeaders(java.util.List.of("*"));
+                    corsConfiguration.setAllowCredentials(true);
+                    return corsConfiguration;
+                }))
+                // -----------------------------------------------------
                 .authorizeHttpRequests(auth -> auth
-                        // BU ADRESLER HERKESE AÇIK OLSUN (Login ve Register)
-                        .requestMatchers("/auth/**").permitAll()
-                        // GERİ KALAN HER YER İÇİN GİRİŞ ŞARTI OLSUN
-                        .anyRequest().authenticated()
+                        .requestMatchers("/auth/**").permitAll() // Giriş/Kayıt serbest
+                        .anyRequest().authenticated() // Gerisi token ister
                 )
-                // Oturum tutma (Stateless), çünkü her istekte Token kontrol ediyoruz.
                 .sessionManagement(sess -> sess.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authenticationProvider(authenticationProvider())
-                // Bizim filtremizi, standart filtrenin önüne koy.
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
