@@ -43,7 +43,7 @@ vector_store = QdrantVectorStore(
 tavily_tool = TavilySearchResults(max_results=3) # En iyi 3 sonucu getir
 
 # 3. LLM (Beyin)
-groq_api_key = os.getenv("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")
+groq_api_key = os.getenv("GROQ_API_KEY")
 
 if not groq_api_key:
     raise ValueError("GROQ_API_KEY bulunamadı! Lütfen .env dosyasına veya Docker ortamına ekleyin.")

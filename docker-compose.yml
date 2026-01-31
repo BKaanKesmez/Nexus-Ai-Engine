@@ -20,9 +20,10 @@ services:
   ai-engine:
     build: .              # Python dosyaları mevcut dizinde
     container_name: nexus-ai-engine
+    env_file: 
+      - .env
     environment:
-      TAVILY_API_KEY: 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
-      GROQ_API_KEY: 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
+      GROQ_API_KEY: ${GROQ_API_KEY}
     ports:
       - "8000:8000"
     networks:
