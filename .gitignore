@@ -16,3 +16,4 @@ qdrant_db/
 
 # VS Code Ayarları (Opsiyonel)
 .vscode/
+.env
