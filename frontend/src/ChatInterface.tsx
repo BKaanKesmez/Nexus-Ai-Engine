@@ -51,14 +51,25 @@ function ChatInterface() {
 
   // A. Sohbet Listesini Getir
   const fetchSessions = async () => {
+  // 1. Token'ı al
+    const token = localStorage.getItem('token'); // İsmi 'jwt' ise onu yaz
+    if (!token) return;
+
     try {
-      const res = await fetch('http://localhost:9090/api/v1/chat/sessions');
-      if (res.ok) {
-        const data = await res.json();
-        setSessions(data);
+      const response = await fetch('http://localhost:9090/api/v1/chat/sessions', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}` // 👈 İŞTE EKSİK PARÇA!
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setSessions(data); // Listeyi güncelle
       }
     } catch (error) {
-      console.error("Geçmiş sohbetler yüklenemedi:", error);
+      console.error("Geçmiş yüklenirken hata:", error);
     }
   };
 
@@ -99,13 +110,23 @@ function ChatInterface() {
   const sendMessage = async () => {
     if (!input.trim()) return;
 
+    // 1. ÖNCE TOKEN'I AL (Burası kritik!)
+    // Giriş yaparken token'ı 'token' adıyla kaydettiğini varsayıyorum.
+    // Eğer farklı bir isimle kaydettiysen (örn: 'jwtToken') onu yaz.
+    const token = localStorage.getItem('token'); 
+
+    if (!token) {
+        console.error("Token bulunamadı! Kullanıcı giriş yapmamış.");
+        // İstersen kullanıcıyı login sayfasına yönlendirebilirsin
+        return;
+    }
+
     const userMsg: Message = { role: 'user', content: input };
     setMessages((prev) => [...prev, userMsg]);
     setInput('');
     setIsLoading(true);
 
     try {
-      // URL oluştur: Eğer aktif bir session varsa ID'sini ekle
       let url = 'http://localhost:9090/api/v1/chat';
       if (currentSessionId) {
         url += `?sessionId=${currentSessionId}`;
@@ -113,16 +134,25 @@ function ChatInterface() {
 
       const response = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+            'Content-Type': 'application/json',
+            // 👇 İŞTE EKSİK OLAN SİHİRLİ SATIR BURASI!
+            'Authorization': `Bearer ${token}` 
+        },
         body: JSON.stringify({ question: userMsg.content }),
       });
 
-      if (!response.ok) throw new Error('Sunucu hatası');
+      if (!response.ok) {
+          // Eğer 403 alırsak token süresi dolmuş olabilir
+          if (response.status === 403) {
+              throw new Error("Yetkisiz Erişim: Lütfen tekrar giriş yapın.");
+          }
+          throw new Error('Sunucu hatası');
+      }
       
       const data = await response.json();
       let answerText = data.answer;
 
-      // Backend'den gelen SESSION ID hilesini yakala ve temizle
       if (answerText.includes("##SESSION_ID:")) {
         const parts = answerText.split("##SESSION_ID:");
         answerText = parts[0]; 
@@ -130,7 +160,7 @@ function ChatInterface() {
         
         if (!currentSessionId) {
           setCurrentSessionId(newSessionId);
-          fetchSessions(); // Listeyi güncelle
+          fetchSessions(); 
         }
       }
 
@@ -138,10 +168,18 @@ function ChatInterface() {
       setMessages((prev) => [...prev, botMsg]);
 
     } catch (error) {
-      console.error("Mesaj gönderme hatası:", error); // Hatayı kullanarak unused variable uyarısını çözdük
+      console.error("Mesaj gönderme hatası:", error);
+
+      let errorMessage = "Backend bağlantısı koptu.";
+
+      // Hata gerçekten bir "Error" nesnesi mi diye kontrol ediyoruz
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+
       setMessages((prev) => [
         ...prev, 
-        { role: 'assistant', content: '⚠️ Bağlantı Hatası: Backend çalışıyor mu?' }
+        { role: 'assistant', content: `⚠️ Hata: ${errorMessage}` }
       ]);
     } finally {
       setIsLoading(false);
