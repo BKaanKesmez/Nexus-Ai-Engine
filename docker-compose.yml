@@ -36,6 +36,7 @@ services:
     container_name: nexus-backend
     ports:
       - "9090:9090"
+      
     depends_on:
       - nexus-db
       - ai-engine
@@ -43,7 +44,7 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://nexus-db:5432/nexusdb
       SPRING_DATASOURCE_USERNAME: nexus
       SPRING_DATASOURCE_PASSWORD: Bk20032511
-      PYTHON_SERVICE_URL: http://ai-engine:8000/ask
+      PYTHON_SERVICE_URL: http://nexus-ai-engine:8000/ask
     networks:
       - nexus-network
 
