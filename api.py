@@ -14,6 +14,10 @@ from dotenv import load_dotenv
 
 load_dotenv() # .env dosyasını okumak için
 
+# Şifrenin yüklendiğini test et (İlk 5 harfini yazdırır)
+api_key = os.getenv("GROQ_API_KEY")
+print(f"🔑 YÜKLENEN API KEY: {api_key[:5] if api_key else 'YOK!'}")
+
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 
