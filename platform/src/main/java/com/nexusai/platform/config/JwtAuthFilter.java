@@ -28,39 +28,44 @@ public class JwtAuthFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
 
-        // 1. İstek başlığından (Header) Token'ı al
         String authHeader = request.getHeader("Authorization");
         String token = null;
         String username = null;
 
-        // 2. Token "Bearer " ile mi başlıyor? Kontrol et.
+        // LOG 1: Header geldi mi?
+        System.out.println("🔍 LOG 1 - İstek Geldi: " + request.getRequestURI());
+        System.out.println("🔍 LOG 2 - Auth Header: " + authHeader);
+
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
-            token = authHeader.substring(7); // "Bearer " kısmını at, sadece kodu al
+            token = authHeader.substring(7);
             try {
-                username = jwtService.extractUsername(token); // İçindeki ismi oku
+                username = jwtService.extractUsername(token);
+                System.out.println("🔍 LOG 3 - Username Okundu: " + username);
             } catch (Exception e) {
-                // Token bozuksa hata basma, sessizce geç (aşağıda zaten reddedilecek)
+                System.out.println("🚨 LOG HATA - Token Okunamadı: " + e.getMessage());
             }
+        } else {
+            System.out.println("⚠️ LOG UYARI - Header eksik veya 'Bearer ' ile başlamıyor!");
         }
 
-        // 3. Kullanıcı adı varsa ve şu an sistemde kimse oturum açmamışsa:
         if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
             UserDetails userDetails = userDetailsService.loadUserByUsername(username);
 
-            // 4. Token geçerli mi?
-            if (jwtService.isTokenValid(token, userDetails)) {
-                // Evet geçerli! Sisteme "Bu adam güvenilirdir" kartını ver.
+            // Token geçerlilik kontrolü
+            boolean isValid = jwtService.isTokenValid(token, userDetails);
+            System.out.println("🔍 LOG 4 - Token Valid mi?: " + isValid);
+
+            if (isValid) {
                 UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
                         userDetails, null, userDetails.getAuthorities());
-
                 authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-
-                // Güvenlik bağlamına (Context) kullanıcıyı oturt.
                 SecurityContextHolder.getContext().setAuthentication(authToken);
+                System.out.println("✅ LOG 5 - Giriş Başarılı, Kapı Açıldı!");
+            } else {
+                System.out.println("❌ LOG 5 - Token Valid Değil! (İmza veya Süre sorunu olabilir)");
             }
         }
 
-        // 5. Zinciri devam ettir (Diğer filtrelere veya Controller'a git)
         filterChain.doFilter(request, response);
     }
 }
