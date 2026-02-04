@@ -6,5 +6,5 @@ import java.util.List;
 
 public interface ChatSessionRepository extends JpaRepository<ChatSession, Long> {
     // Tüm sohbetleri, en yeniden en eskiye doğru sıralayıp getir
-    List<ChatSession> findAllByOrderByCreatedAtDesc();
+    List<ChatSession> findByUser_UsernameOrderByCreatedAtDesc(String username);
 }
