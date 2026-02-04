@@ -1,4 +1,5 @@
 # Sanal Ortamları Yoksay
+.env
 .venv/
 venv/
 env/
