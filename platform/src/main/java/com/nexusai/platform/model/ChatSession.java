@@ -1,8 +1,8 @@
 package com.nexusai.platform.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.List;
 
 @Entity
@@ -13,20 +13,21 @@ public class ChatSession {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    private String title; // Örn: "Yapay Zeka Nedir?"
+    private String title;
 
-    private LocalDateTime createdAt;
+    private LocalDateTime createdAt = LocalDateTime.now();
 
-    // Bir sohbetin birden çok mesajı olabilir (One-To-Many)
-    @OneToMany(mappedBy = "session", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private List<ChatMessage> messages = new ArrayList<>();
+    // 👇 EKSİK OLAN KISIM BURASIYDI: User İlişkisi
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id") // Veritabanındaki sütun adı
+    @JsonIgnore // Sonsuz döngüye girmemesi için (User -> Session -> User...)
+    private User user;
 
-    // --- Constructor ---
-    public ChatSession() {
-        this.createdAt = LocalDateTime.now();
-    }
+    @OneToMany(mappedBy = "session", cascade = CascadeType.ALL)
+    private List<ChatMessage> messages;
 
-    // --- Getter & Setter ---
+    // --- GETTER & SETTER METODLARI ---
+
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 
@@ -38,4 +39,9 @@ public class ChatSession {
 
     public List<ChatMessage> getMessages() { return messages; }
     public void setMessages(List<ChatMessage> messages) { this.messages = messages; }
+
+    // 👇 BUNLARI EKLEMEZSEN 'Cannot resolve method' HATASI ALIRSIN
+    public User getUser() { return user; }
+
+    public void setUser(User user) { this.user = user; }
 }
